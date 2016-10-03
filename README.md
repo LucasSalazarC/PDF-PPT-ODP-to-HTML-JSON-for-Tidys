@@ -4,5 +4,5 @@ Converts a PDF file to HTML. If the file is a .ppt, .pptx or .odp, it converts t
 Also creates a JSON file (for the Tidys application)
 
 Requires:
-    Libreoffice installed
-    pdf2htmlEX docker image installed. See: https://github.com/coolwanglu/pdf2htmlEX
+  *  Libreoffice installed
+  *  pdf2htmlEX docker image installed. See: https://github.com/coolwanglu/pdf2htmlEX
