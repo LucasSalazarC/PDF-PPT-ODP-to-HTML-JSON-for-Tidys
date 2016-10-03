@@ -2,8 +2,9 @@
 
 from subprocess import call
 from os import makedirs, path
+from shutil import move
 
-def pdf_to_html_json(presentation_fullpath):
+def pdf_to_html_json(presentation_fullpath, dest_dir=None):
     
     # Get directory, filename, extension
     name_length = len(presentation_fullpath.split('/')[-1])
@@ -38,9 +39,9 @@ def pdf_to_html_json(presentation_fullpath):
     json_filename = filename + '.json'
     
     # Create output directory
-    dest_dir = directory + filename + '/'
-    if not path.exists(dest_dir):
-        makedirs(dest_dir)
+    temp_dir = directory + filename + '/'
+    if not path.exists(temp_dir):
+        makedirs(temp_dir)
     
     # Command to generate html using pdf2htmlex dockerfile
     command =   'docker run -ti --rm -v ' + directory + \
@@ -55,7 +56,7 @@ def pdf_to_html_json(presentation_fullpath):
     found_flag = 0
     page = []
 
-    html = open(dest_dir + html_filename, 'r')
+    html = open(temp_dir + html_filename, 'r')
 
     for line in html.readlines():
         if line.startswith('<div id="pf'):
@@ -73,7 +74,7 @@ def pdf_to_html_json(presentation_fullpath):
     html_url = 'https://cg.tidys.io/ltec/presentation.html'
 
     # Create .json file with same name as pdf file
-    json_file = open(dest_dir + json_filename, 'w')
+    json_file = open(temp_dir + json_filename, 'w')
 
     # Write .json file
     json_file.write('{\n')
@@ -90,6 +91,12 @@ def pdf_to_html_json(presentation_fullpath):
     json_file.write('}\n')
 
     json_file.close()
+    
+    
+    
+    # Move directory containing HTML and JSON to dest_dir
+    if dest_dir is not None:
+        move(temp_dir, dest_dir)
     
     
     return
