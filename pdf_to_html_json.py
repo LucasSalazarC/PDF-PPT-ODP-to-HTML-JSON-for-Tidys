@@ -1,7 +1,8 @@
 
 from subprocess import call
 from os import makedirs, path, walk
-from shutil import move, copyfile
+from shutil import move, copyfile, rmtree
+import json
 
 def pdf_to_html_json(presentation_fullpath, dest_dir=None, conv_to_img=1, url='https://lucas.tidys.io/'):
     
@@ -48,7 +49,12 @@ def pdf_to_html_json(presentation_fullpath, dest_dir=None, conv_to_img=1, url='h
     
     # Convert pdf to image and write html manually
     if conv_to_img:
-        command = 'convert ' + directory + pdf_filename + ' ' + temp_dir + filename + '.png'
+        # Using Imagemagick
+        # command = 'convert -density 432 ' + directory + pdf_filename + ' -quality 100 ' + temp_dir + filename + '.png'
+        
+        # Using pdf2svg
+        command = 'pdf2svg ' + directory + pdf_filename + ' ' + temp_dir + filename + '-%d.svg all'
+        
         call(command.split(' '))
         
         html = open(temp_dir + html_filename, 'w')
@@ -57,7 +63,7 @@ def pdf_to_html_json(presentation_fullpath, dest_dir=None, conv_to_img=1, url='h
         png_counter = 0
         for root, dirs, files in walk(temp_dir):
             for file in files:    
-                if file.endswith('.png'):
+                if file.endswith('.svg'):
                     png_counter += 1
                     
         # Write html
@@ -79,7 +85,7 @@ def pdf_to_html_json(presentation_fullpath, dest_dir=None, conv_to_img=1, url='h
         for i in range(png_counter):
             html.write('    <section id="pf' + format(i + 1,'0x') + '" class="level1 vflex">')
             html.write('        <figure>\n')
-            html.write('            <img src="' + filename + '-' + str(i) + '.png" />\n')
+            html.write('            <img src="' + filename + '-' + str(i + 1) + '.svg" />\n')
             html.write('        </figure>\n')
             html.write('    </section>\n')
 
@@ -109,33 +115,31 @@ def pdf_to_html_json(presentation_fullpath, dest_dir=None, conv_to_img=1, url='h
             page.append(line.split('"')[1])
             
     html.close()
-
-
-    html_url = url + html_filename
-
-    # Create .json file with same name as pdf file
-    json_file = open(temp_dir + json_filename, 'w')
-
-    # Write .json file
-    json_file.write('{\n')
-    json_file.write('  "name": ' + '"' + pdf_filename[0:-4] + '",\n')
-    json_file.write('  "slides": [\n')
-
+    
+    
+    html_url = url + filename + '/' + html_filename
+    
+    # Create json file as dictionary, then dump into file
+    json_dict = {}
+    json_dict["name"] = filename
+    json_dict["slides"] = []
+    
     for item in page:
-        json_file.write('    {\n')
-        json_file.write('      "question": null,\n')
-        json_file.write('      "url": "' + html_url + '#' + item + '"\n')
-        json_file.write('    },\n')
-        
-    json_file.write('  ]\n')
-    json_file.write('}\n')
+        temp = {"question": 'null'}
+        temp["url"] = html_url + '#' + item
+        json_dict["slides"].append(temp)
+        del temp
+    
+    with open(temp_dir + json_filename, 'w') as fp:
+        json.dump(json_dict, fp)
 
-    json_file.close()
     
     
     
     # Move directory containing HTML and JSON to dest_dir
     if dest_dir is not None:
+        if path.exists(dest_dir):
+            rmtree(dest_dir, ignore_errors=True)
         move(temp_dir, dest_dir)
     
     
