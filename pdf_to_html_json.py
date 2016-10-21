@@ -1,10 +1,9 @@
 
-
 from subprocess import call
-from os import makedirs, path
-from shutil import move
+from os import makedirs, path, walk
+from shutil import move, copyfile
 
-def pdf_to_html_json(presentation_fullpath, dest_dir=None):
+def pdf_to_html_json(presentation_fullpath, dest_dir=None, conv_to_img=1, url='https://lucas.tidys.io/'):
     
     # Get directory, filename, extension
     name_length = len(presentation_fullpath.split('/')[-1])
@@ -42,36 +41,77 @@ def pdf_to_html_json(presentation_fullpath, dest_dir=None):
     temp_dir = directory + filename + '/'
     if not path.exists(temp_dir):
         makedirs(temp_dir)
+        
+    # Copy style.css
+    copyfile('style.css', temp_dir + 'style.css')
     
-    # Command to generate html using pdf2htmlex dockerfile
-    command =   'docker run -ti --rm -v ' + directory + \
-                ':/pdf bwits/pdf2htmlex pdf2htmlEX --embed cfijo ' + \
-                 '--dest-dir ' + filename + ' --zoom 1.3 ' + pdf_filename
-                
-    call(command.split(' '))
+    
+    # Convert pdf to image and write html manually
+    if conv_to_img:
+        command = 'convert ' + directory + pdf_filename + ' ' + temp_dir + filename + '.png'
+        call(command.split(' '))
+        
+        html = open(temp_dir + html_filename, 'w')
+        
+        # Count number of png images, which is the number of pages in the pdf
+        png_counter = 0
+        for root, dirs, files in walk(temp_dir):
+            for file in files:    
+                if file.endswith('.png'):
+                    png_counter += 1
+                    
+        # Write html
+        html.write('<!DOCTYPE html>\n')
+        html.write('<html>\n')
+        html.write('<head>\n')
+        html.write('    <meta charset="utf-8">\n')
+        html.write('    <meta name="generator" content="pandoc">\n')
+        html.write('    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">\n')
+        html.write('    <title></title>\n')
+        html.write('    <style type="text/css">code{white-space: pre;}</style>\n')
+        html.write('    <link rel="stylesheet" href="style.css">\n')
+        html.write('    <!--[if lt IE 9]>\n')
+        html.write('    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>\n')
+        html.write('    <![endif]--><link rel="stylesheet" href="https://use.fontawesome.com/4b0be90c69.css" media="all">\n')
+        html.write('</head>\n')
+        html.write('<body>\n')
+        
+        for i in range(png_counter):
+            html.write('    <section id="pf' + format(i + 1,'0x') + '" class="level1 vflex">')
+            html.write('        <figure>\n')
+            html.write('            <img src="' + filename + '-' + str(i) + '.png" />\n')
+            html.write('        </figure>\n')
+            html.write('    </section>\n')
+
+        html.write('</body>\n')
+        html.write('</html>\n')
+        
+        html.close()
+            
+    
+    else:
+        # Command to generate html using pdf2htmlex dockerfile
+        command =   'docker run -ti --rm -v ' + directory + \
+                    ':/pdf bwits/pdf2htmlex pdf2htmlEX --embed cfijo ' + \
+                     '--dest-dir ' + filename + ' --zoom 1.3 ' + pdf_filename
+                    
+        call(command.split(' '))
 
 
 
     # Read html document and get the Ids of every page
-    found_flag = 0
     page = []
 
     html = open(temp_dir + html_filename, 'r')
 
     for line in html.readlines():
-        if line.startswith('<div id="pf'):
-            found_flag = 1
+        if line.startswith('<div id="pf') or '<section id="pf' in line:
             page.append(line.split('"')[1])
-        elif found_flag == 1:
-            break
             
     html.close()
 
 
-
-    # NEED TO FIX THIS
-    # Need a way to get the url of the html file stored in the server
-    html_url = 'https://cg.tidys.io/ltec/presentation.html'
+    html_url = url + html_filename
 
     # Create .json file with same name as pdf file
     json_file = open(temp_dir + json_filename, 'w')
